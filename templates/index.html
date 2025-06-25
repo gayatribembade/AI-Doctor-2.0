@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Doctor with Vision and Voice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 AI Doctor Assistant</h1>
+            <p>Advanced medical image analysis with voice interaction powered by AI</p>
+        </div>
+
+        <form id="analysisForm" enctype="multipart/form-data">
+            <div class="main-content">
+                <div class="card">
+                    <h3><i class="fas fa-microphone"></i> Voice Input</h3>
+                    
+                    <div class="input-group">
+                        <label>Audio Input</label>
+                        <div class="audio-input-container">
+                            <!-- Recording Controls -->
+                            <div class="recording-controls">
+                                <button type="button" id="record-button" class="record-btn">
+                                    <i class="fas fa-microphone"></i>
+                                    <span>Start Recording</span>
+                                </button>
+                                <div class="recording-status" id="recording-status">
+                                    <div class="recording-indicator" id="recording-indicator"></div>
+                                    <span id="recording-time">00:00</span>
+                                </div>
+                            </div>
+                            
+                            <div class="recorded-audio" id="recorded-audio" style="display: none;">
+                                <audio controls class="recorded-audio-player" id="recorded-audio-player"></audio>
+                                <button type="button" id="clear-recording" class="clear-btn">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                            </div>
+
+                            <!-- OR separator -->
+                            <div class="separator">
+                                <span>OR</span>
+                            </div>
+
+                            <!-- File Upload -->
+                            <div class="file-input-wrapper">
+                                <input type="file" id="audio" name="audio" accept="audio/*">
+                                <div class="file-input-content">
+                                    <i class="fas fa-upload"></i>
+                                    <p>Click to upload audio file or drag & drop</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="image">Upload Medical Image</label>
+                        <div class="file-input-wrapper" id="image-upload-wrapper">
+                            <input type="file" id="image" name="image" accept="image/*">
+                            <div class="file-input-content">
+                                <i class="fas fa-camera"></i>
+                                <p>Click to upload image or drag & drop</p>
+                            </div>
+                        </div>
+                        <div class="image-preview" id="image-preview" style="display: none;">
+                            <img id="preview-img" src="" alt="Preview">
+                            <br>
+                            <button type="button" class="remove-image" id="remove-image">
+                                <i class="fas fa-times"></i> Remove Image
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="analyze-btn">
+                        <i class="fas fa-search"></i> Get Medical Analysis
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-chart-line"></i> Analysis Results</h3>
+                    
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p style="color: rgba(255,255,255,0.8);">Analyzing your input...</p>
+                    </div>
+
+                    <div class="error" id="error"></div>
+
+                    <div class="results-section" id="results">
+                        <div class="result-item">
+                            <label>🗣️ Your Question (Transcribed)</label>
+                            <textarea class="result-text" id="speechText" readonly rows="3"></textarea>
+                        </div>
+
+                        <div class="result-item">
+                            <label>👨‍⚕️ Doctor's Analysis</label>
+                            <textarea class="result-text" id="doctorResponse" readonly rows="6"></textarea>
+                        </div>
+
+                        <div class="result-item">
+                            <label>🔊 Audio Response</label>
+                            <audio class="audio-player" id="audioResponse" controls style="display: none;">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+
+                        <div class="result-item" id="uploaded-image-container" style="display: none;">
+                            <label>📷 Uploaded Image</label>
+                            <div class="image-preview">
+                                <img id="uploaded-image" src="" alt="Uploaded Image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="disclaimer">
+            <p><strong>⚠️ Medical Disclaimer:</strong> This is an AI assistant for educational purposes only. Always consult with qualified healthcare professionals for medical advice, diagnosis, or treatment.</p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('analysisForm');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const error = document.getElementById('error');
+        const analyzeBtn = document.querySelector('.analyze-btn');
+
+        // Recording variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingStartTime;
+        let recordingTimer;
+        let recordedBlob = null;
+
+        const recordButton = document.getElementById('record-button');
+        const recordingStatus = document.getElementById('recording-status');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const recordingTime = document.getElementById('recording-time');
+        const recordedAudio = document.getElementById('recorded-audio');
+        const recordedAudioPlayer = document.getElementById('recorded-audio-player');
+        const clearRecordingBtn = document.getElementById('clear-recording');
+
+        // Image preview elements
+        const imageInput = document.getElementById('image');
+        const imagePreview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        const removeImageBtn = document.getElementById('remove-image');
+        const imageUploadWrapper = document.getElementById('image-upload-wrapper');
+
+        // File input visual feedback
+        document.querySelectorAll('input[type="file"]').forEach(input => {
+            input.addEventListener('change', function(e) {
+                const wrapper = this.closest('.file-input-wrapper');
+                const content = wrapper.querySelector('.file-input-content p');
+                if (this.files.length > 0) {
+                    content.textContent = this.files[0].name;
+                    wrapper.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                    wrapper.style.background = 'rgba(16, 185, 129, 0.1)';
+                }
+            });
+        });
+
+        // Image preview functionality
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    imageUploadWrapper.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        removeImageBtn.addEventListener('click', function() {
+            imageInput.value = '';
+            imagePreview.style.display = 'none';
+            imageUploadWrapper.style.display = 'block';
+            // Reset upload wrapper styles
+            imageUploadWrapper.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+            imageUploadWrapper.style.background = 'rgba(255, 255, 255, 0.05)';
+            const content = imageUploadWrapper.querySelector('.file-input-content p');
+            content.textContent = 'Click to upload image or drag & drop';
+        });
+
+        // Recording functionality
+        recordButton.addEventListener('click', toggleRecording);
+        clearRecordingBtn.addEventListener('click', clearRecording);
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100
+                        }
+                    });
+                    
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
+                    
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioUrl = URL.createObjectURL(recordedBlob);
+                        recordedAudioPlayer.src = audioUrl;
+                        recordedAudio.style.display = 'block';
+                        
+                        // Stop all tracks to release microphone
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start(1000); // Collect data every second
+                    startRecording();
+                    
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    showError('Please allow microphone access to record your voice.');
+                }
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            isRecording = true;
+            recordingStartTime = Date.now();
+            
+            recordButton.innerHTML = '<i class="fas fa-stop"></i><span>Stop Recording</span>';
+            recordButton.classList.add('recording');
+            recordingStatus.classList.add('active');
+            recordingIndicator.classList.add('pulse');
+            
+            // Start timer
+            recordingTimer = setInterval(updateRecordingTime, 1000);
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            mediaRecorder.stop();
+            
+            recordButton.innerHTML = '<i class="fas fa-microphone"></i><span>Start Recording</span>';
+            recordButton.classList.remove('recording');
+            recordingStatus.classList.remove('active');
+            recordingIndicator.classList.remove('pulse');
+            
+            clearInterval(recordingTimer);
+        }
+
+        function updateRecordingTime() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function clearRecording() {
+            recordedBlob = null;
+            recordedAudio.style.display = 'none';
+            recordedAudioPlayer.src = '';
+            recordingTime.textContent = '00:00';
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('show');
+            setTimeout(() => error.classList.remove('show'), 5000);
+        }
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Show loading state
+            loading.classList.add('show');
+            results.classList.remove('show');
+            error.classList.remove('show');
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+
+            try {
+                const formData = new FormData(form);
+                
+                // Add recorded audio if available
+                if (recordedBlob && !formData.get('audio')) {
+                    formData.set('audio', recordedBlob, 'recorded_audio.webm');
+                }
+                
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Display results
+                    document.getElementById('speechText').value = data.speech_text || 'No audio provided';
+                    document.getElementById('doctorResponse').value = data.doctor_response;
+                    
+                    // Handle audio response
+                    if (data.audio_response) {
+                        const audioPlayer = document.getElementById('audioResponse');
+                        audioPlayer.src = `/audio/${data.audio_response}`;
+                        audioPlayer.style.display = 'block';
+                    }
+                    
+                    // Display uploaded image in results
+                    if (data.uploaded_image) {
+                        const uploadedImageContainer = document.getElementById('uploaded-image-container');
+                        const uploadedImage = document.getElementById('uploaded-image');
+                        uploadedImage.src = `/image/${data.uploaded_image}`;
+                        uploadedImageContainer.style.display = 'block';
+                    }
+                    
+                    results.classList.add('show');
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+            } catch (err) {
+                showError(`Error: ${err.message}`);
+            } finally {
+                // Hide loading state
+                loading.classList.remove('show');
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-search"></i> Get Medical Analysis';
+            }
+        });
+
+        // Drag and drop functionality
+        document.querySelectorAll('.file-input-wrapper').forEach(wrapper => {
+            wrapper.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                this.style.background = 'rgba(16, 185, 129, 0.1)';
+            });
+
+            wrapper.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                this.style.background = 'rgba(255, 255, 255, 0.05)';
+            });
+
+            wrapper.addEventListener('drop', function(e) {
+                e.preventDefault();
+                const input = this.querySelector('input[type="file"]');
+                if (input) {
+                    input.files = e.dataTransfer.files;
+                    input.dispatchEvent(new Event('change'));
+                }
+                this.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                this.style.background = 'rgba(255, 255, 255, 0.05)';
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,4 +1,9 @@
-# Project Setup Guide
+
+# AI Doctor 2.0 - Project Setup & Usage Guide
+
+AI Doctor 2.0 is a multimodal AI-powered assistant for medical image analysis and voice interaction. It uses Flask for the backend, a modern Tailwind CSS frontend, and integrates LLMs for image and text analysis, speech-to-text, and text-to-speech features.
+
+---
 
 This guide provides step-by-step instructions to set up your project environment, including the installation of FFmpeg and PortAudio across macOS, Linux, and Windows, as well as setting up a Python virtual environment using Pipenv, pip, or conda.
 
@@ -13,6 +18,8 @@ This guide provides step-by-step instructions to set up your project environment
    - [Using pip and venv](#using-pip-and-venv)
    - [Using Conda](#using-conda)
 3. [Running the application](#project-phases-and-python-commands)
+4. [Docker Deployment](#docker-deployment)
+5. [Project Architecture & Features](#project-architecture--features)
 
 ## Installing FFmpeg and PortAudio
 
@@ -130,6 +137,7 @@ pip install -r requirements.txt
 ```
 
 
+
 # Project Phases and Python Commands
 
 ## Phase 1: Brain of the doctor
@@ -147,8 +155,76 @@ python voice_of_the_patient.py
 python voice_of_the_doctor.py
 ```
 
-## Phase 4: Setup Gradio UI
+
+## Phase 4: Run the Main Flask App
 ```
 python app.py
 ```
+
+---
+
+# Docker Deployment
+
+You can run the entire project in a Docker container (recommended for easy deployment):
+
+1. **Build the Docker image:**
+   ```sh
+   docker build -t ai-doctor-app .
+   ```
+2. **Run the container:**
+   ```sh
+   docker run -p 8000:8000 ai-doctor-app
+   ```
+3. **Access the app:**
+   Open your browser at [http://localhost:8000](http://localhost:8000)
+
+---
+
+# Project Architecture & Features
+
+**Main Components:**
+- `app.py`: Flask backend, handles all user requests, file uploads, and routes.
+- `brain_of_the_doctor.py`: Encodes images and sends them to a multimodal LLM for medical analysis.
+- `voice_of_the_patient.py`: Converts user audio to text (speech-to-text).
+- `voice_of_the_doctor.py`: Converts text responses to audio (text-to-speech).
+- `templates/index.html`: Modern Tailwind CSS frontend for user interaction.
+
+**Key Features:**
+- Upload medical images and/or record/upload voice questions.
+- AI analyzes images and answers questions using LLMs.
+- Doctor's response is returned as both text and audio.
+- Fully containerized with Docker for easy deployment anywhere.
+
+**Architecture Flow:**
+
+```
+User (Web UI)
+   |
+   v
+[Flask Backend (app.py)]
+   |         |         |
+   |         |         |
+   v         v         v
+Image   Audio File   (Text)
+ |         |           |
+ v         v           |
+[brain_of_the_doctor]  |
+   |                   |
+   v                   |
+LLM Medical Analysis   |
+   |                   |
+   v                   |
+Text Response <--------+
+   |
+   v
+[voice_of_the_doctor.py] (Text-to-Speech)
+   |
+   v
+Audio Response
+   |
+   v
+User (Web UI)
+```
+
+---
 

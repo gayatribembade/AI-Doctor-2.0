@@ -149,6 +149,6 @@ python voice_of_the_doctor.py
 
 ## Phase 4: Setup Gradio UI
 ```
-python gradio_app.py
+python app.py
 ```
 
